@@ -1,0 +1,28 @@
+{
+  "name": "cobaltx-sdk-example",
+  "version": "1.0.0",
+  "main": "src/swap.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/swap.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/big.js": "^6.1.6",
+    "@types/bn.js": "^5.1.6",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@cobaltx/sdk-v2": "file:../interface-monorepo/packages/sdk-v2",
+    "@solana/web3.js": "^1.98.0",
+    "base58": "^2.0.1",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "decimal.js": "^10.5.0",
+    "dotenv": "^16.4.7"
+  }
+}
