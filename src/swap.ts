@@ -97,7 +97,7 @@ async function main() {
   const cobaltx = await initSdk({
     owner,
     conn,
-    cluster: "devnet",
+    cluster: "mainnet",
     loadToken: true,
   });
 

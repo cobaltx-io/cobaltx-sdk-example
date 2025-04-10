@@ -6,6 +6,11 @@
     "build": "tsc",
     "swap": "tsc && node dist/swap.js",
     "get-position": "tsc && node dist/getPosition.js",
+    "create-position": "tsc && node dist/createPosition.js",
+    "increase-liquidity": "tsc && node dist/increaseLiquidity.js",
+    "decrease-liquidity": "tsc && node dist/decreaseLiquidity.js",
+    "close-position": "tsc && node dist/closePosition.js",
+    "harvest-rewards": "tsc && node dist/harvestRewards.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

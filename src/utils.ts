@@ -1,3 +1,4 @@
+import { CLMM_PROGRAM_ID, DEVNET_PROGRAM_ID } from "@cobaltx/sdk-v2";
 import { Connection, Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 
@@ -50,3 +51,7 @@ export class AccountLoader {
     return Keypair.fromSecretKey(Uint8Array.from(privateKeyBuffer));
   }
 }
+
+const VALID_PROGRAM_ID = new Set([CLMM_PROGRAM_ID.toBase58(), DEVNET_PROGRAM_ID.CLMM.toBase58()])
+
+export const isValidClmm = (id: string) => VALID_PROGRAM_ID.has(id)
