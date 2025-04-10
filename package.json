@@ -4,7 +4,8 @@
   "main": "src/swap.ts",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/swap.js",
+    "swap": "tsc && node dist/swap.js",
+    "get-position": "tsc && node dist/getPosition.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
