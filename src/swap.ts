@@ -1,8 +1,11 @@
-import { CobaltX, SOL_INFO, TxVersion, computeSwap } from "@cobaltx/sdk-v2";
-import { Connection, Keypair } from "@solana/web3.js";
+import { API_URLS, CobaltX, TxVersion, getApiUrl } from "@cobaltx/sdk-v2";
+import { Connection, Keypair, PublicKey, VersionedMessage, VersionedTransaction } from "@solana/web3.js";
 import BN from "bn.js";
 import Decimal from "decimal.js";
 import { AccountLoader, getConnection, sendTxn } from "./utils";
+import { NetworkName } from "@cobaltx/sdk-v2/lib/config";
+import axios from "axios";
+import base58 from "bs58";
 require("dotenv").config();
 
 export async function initSdk(params: {
@@ -18,6 +21,7 @@ export async function initSdk(params: {
     disableFeatureCheck: true,
     disableLoadToken: !params?.loadToken,
     blockhashCommitment: "finalized",
+    network: NetworkName.sooneth,
   });
 
   return cobaltx;
@@ -25,65 +29,83 @@ export async function initSdk(params: {
 
 async function swap({
   cobaltx,
-  poolId,
   inputMint,
   inputAmount,
+  outputMint,
   txVersion,
   slippage,
-  swapType,
   owner,
   conn,
 }: {
   cobaltx: CobaltX;
-  poolId: string;
   inputMint: string;
+  outputMint: string;
   inputAmount: BN;
   txVersion: TxVersion;
   slippage: number;
-  swapType: SwapType;
   owner: Keypair;
   conn: Connection;
 }) {
-  const data = await cobaltx.clmm.getPoolInfoFromRpc(poolId);
-  const poolInfo = data.poolInfo;
+  const swapComputeUrl =
+    inputMint && outputMint && !new Decimal(inputAmount.toString() || 0).isZero()
+      ? `${getApiUrl(NetworkName.sooneth).SWAP_HOST}${
+          API_URLS.SWAP_COMPUTE
+        }swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${inputAmount.toString()}&slippageBps=${slippage}&txVersion=${
+          txVersion === TxVersion.V0 ? "V0" : "LEGACY"
+        }`
+      : null;
 
-  if (
-    inputMint !== poolInfo.mintA.address &&
-    inputMint !== poolInfo.mintB.address
-  )
-    throw new Error("input mint does not match pool");
+  if (!swapComputeUrl) {
+    throw new Error("Swap compute url generation failed");
+  }
 
-  const baseIn = inputMint === poolInfo.mintA.address;
+  const computeSwapResponse = await axios.get(swapComputeUrl).then((res) => res.data).catch((err) => {
+    console.error(err)
+    throw new Error("Swap compute failed");
+  })
 
-  const computeSwapResponse = await computeSwap({
-    inputMint: inputMint,
-    outputMint: poolInfo[baseIn ? "mintB" : "mintA"].address,
-    amount: inputAmount.toString(),
-    slippage,
-    swapType,
-    txVersion,
+  const inputToken = await cobaltx.token.getTokenInfo(new PublicKey(inputMint))
+  const outputToken = await cobaltx.token.getTokenInfo(new PublicKey(outputMint))
+
+  const inputTokenAcc = await cobaltx.account.getCreatedTokenAccount({
+    programId: new PublicKey(inputToken.programId ?? "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5D"),
+    mint: new PublicKey(inputToken.address),
+    associatedOnly: false
+  })
+
+  const outputTokenAcc = await cobaltx.account.getCreatedTokenAccount({
+    programId: new PublicKey(outputToken.programId ?? "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5D"),
+    mint: new PublicKey(outputToken.address)
+  })
+
+  const buildTxResponse = await axios.post(
+    `${getApiUrl(NetworkName.sooneth).SWAP_HOST}${API_URLS.SWAP_TX}swap-base-in`,
+    {
+      wallet: owner.publicKey.toBase58(),
+      computeUnitPriceMicroLamports: Number((computeSwapResponse.data?.microLamports || 0).toFixed(0)),
+      swapResponse: computeSwapResponse.data,
+      txVersion: txVersion === TxVersion.V0 ? 'V0' : 'LEGACY',
+      wrapSol: true,
+      unwrapSol: false,
+      inputAccount: inputTokenAcc,
+      outputAccount: outputTokenAcc
+    }
+  ).then((res) => res.data).catch((err) => {
+    console.error(err)
+    throw new Error("Swap transaction generation failed");
+  })
+  const swapTransactions = buildTxResponse.data || []
+  const allTxBuf = swapTransactions.map((tx: any) => base58.decode(tx.transaction))
+  const allTx = allTxBuf.map((txBuf: any) => new VersionedTransaction(VersionedMessage.deserialize(Uint8Array.from(txBuf))))
+
+  const signedTransactions = allTx.map((tx: VersionedTransaction) => {
+    tx.sign([owner]);
+    return tx;
   });
-
-  const { success, unsignedVersionedTxs } = await cobaltx.tradeV2.swapTokenAct({
-    swapResponse: computeSwapResponse,
-    txVersion: txVersion,
-    microLamports: new Decimal("0" as string)
-      .mul(10 ** SOL_INFO.decimals)
-      .toDecimalPlaces(0)
-      .toNumber(),
-    publicKey: owner.publicKey,
-    unwrapSol: false,
-    inputTokenAddress: inputMint,
-    inputTokenProgramId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-    outputTokenAddress: poolInfo[baseIn ? "mintB" : "mintA"].address,
-    outputTokenProgramId: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
-  });
-
-  unsignedVersionedTxs.map((tx) => tx.sign([owner]));
 
   await sendTxn(
-    Promise.all(unsignedVersionedTxs.map((tx) => conn.sendTransaction(tx))),
-    `swap in clmm pool`
+    Promise.all(signedTransactions.map((tx: VersionedTransaction) => conn.sendTransaction(tx))),
+    `Swap from ${inputMint} to ${outputMint}`
   );
 }
 
@@ -92,7 +114,7 @@ export type SwapType = "BaseIn" | "BaseOut";
 async function main() {
   const al = new AccountLoader();
   const owner = al.getKeypairFromEnvironmentDecrypt();
-  const conn = getConnection("mainnet");
+  const conn = await getConnection(NetworkName.sooneth);
   const txVersion = TxVersion.LEGACY; // or TxVersion.LEGACY
   const cobaltx = await initSdk({
     owner,
@@ -101,20 +123,18 @@ async function main() {
     loadToken: true,
   });
 
-  const poolId = "646x4X8ENfqjeVHPkhkiqSaB4qqZBYnKrVC9hqZJCZBp";
   const inputMint = "So11111111111111111111111111111111111111112";
-  const inputAmount = new BN(100);
-  const slippage = 0.01;
-  const swapType: SwapType = "BaseIn";
+  const inputAmount = new BN(10000000);
+  const outputMint = "ERFzpDteGNo8LTDKW1WwVGrkRMmA2y9WZHXNHxMA6BSV";
+  const slippage = 0.5;
 
   await swap({
     cobaltx,
-    poolId,
     inputMint,
     inputAmount,
+    outputMint,
     txVersion,
     slippage,
-    swapType,
     owner,
     conn,
   });

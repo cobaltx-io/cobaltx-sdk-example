@@ -1,6 +1,7 @@
 import { ApiV3PoolInfoConcentratedItem, ClmmKeys, CobaltX, TxVersion } from "@cobaltx/sdk-v2";
 import { Connection, Keypair } from "@solana/web3.js";
 import { AccountLoader, getConnection, isValidClmm } from "./utils";
+import { NetworkName } from "@cobaltx/sdk-v2/lib/config";
 require("dotenv").config();
 
 export async function initSdk(params: {
@@ -16,6 +17,7 @@ export async function initSdk(params: {
     disableFeatureCheck: true,
     disableLoadToken: !params?.loadToken,
     blockhashCommitment: "finalized",
+    network: NetworkName.sooneth,
   });
 
   return cobaltx;
@@ -24,7 +26,7 @@ export async function initSdk(params: {
 async function main() {
   const al = new AccountLoader();
   const owner = al.getKeypairFromEnvironmentDecrypt();
-  const conn = getConnection("mainnet");
+  const conn = await getConnection(NetworkName.sooneth);
   const txVersion = TxVersion.LEGACY;
   const cobaltx = await initSdk({
     owner,
@@ -54,7 +56,7 @@ async function main() {
 
   // don't want to wait confirm, set sendAndConfirm to false or don't pass any params to execute
   const { txId } = await execute({ sendAndConfirm: true });
-  console.log('clmm position closed:', { txId: `https://explorer.soo.network/tx/${txId}` });
+  console.log(`clmm position closed with tx: ${txId}`);
 }
 
 if (require.main === module) {

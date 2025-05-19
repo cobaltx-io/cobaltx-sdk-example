@@ -2,6 +2,7 @@ import { ApiV3PoolInfoConcentratedItem, ClmmKeys, CobaltX, TxVersion } from "@co
 import { Connection, Keypair } from "@solana/web3.js";
 import BN from "bn.js";
 import { AccountLoader, getConnection, isValidClmm } from "./utils";
+import { NetworkName } from "@cobaltx/sdk-v2/lib/config";
 require("dotenv").config();
 
 export async function initSdk(params: {
@@ -17,6 +18,7 @@ export async function initSdk(params: {
     disableFeatureCheck: true,
     disableLoadToken: !params?.loadToken,
     blockhashCommitment: "finalized",
+    network: NetworkName.sooneth,
   });
 
   return cobaltx;
@@ -25,7 +27,7 @@ export async function initSdk(params: {
 async function main() {
   const al = new AccountLoader();
   const owner = al.getKeypairFromEnvironmentDecrypt();
-  const conn = getConnection("mainnet");
+  const conn = await getConnection(NetworkName.sooneth);
   const txVersion = TxVersion.LEGACY;
   const cobaltx = await initSdk({
     owner,
@@ -35,7 +37,7 @@ async function main() {
   });
 
   let poolInfo: ApiV3PoolInfoConcentratedItem;
-  const poolId = "G2vXEnaYkUbGpsC3tbLYjhjZpCACm4n41g8Q7BM1V6NS";
+  const poolId = "HXVLdBv2FMNLUw74rbfcLhV8eYTJbzufN9v8ep97FEsu";
   let poolKeys: ClmmKeys | undefined;
 
   const data = await cobaltx.api.fetchPoolById({ ids: poolId });
@@ -65,7 +67,7 @@ async function main() {
 
   // don't want to wait confirm, set sendAndConfirm to false or don't pass any params to execute
   const { txId } = await execute({ sendAndConfirm: true });
-  console.log('clmm position harvested rewards:', { txId: `https://explorer.soo.network/tx/${txId}` });
+  console.log(`clmm position harvested rewards with tx: ${txId}`);
 }
 
 if (require.main === module) {

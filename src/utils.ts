@@ -1,19 +1,16 @@
-import { CLMM_PROGRAM_ID, DEVNET_PROGRAM_ID } from "@cobaltx/sdk-v2";
+import { API_URLS, getApiUrl, getCLMMProgramId } from "@cobaltx/sdk-v2";
+import { NetworkName } from "@cobaltx/sdk-v2/lib/config";
 import { Connection, Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
+import axios from "axios";
 
 /**
  * Loads the connection to the Solana blockchain.
  * This uses the default endpoint for the cluster.
  */
-export function getConnection(
-  cluster: "mainnet" | "devnet" = "devnet"
-): Connection {
-  const endpoint =
-    cluster === "mainnet"
-      ? "https://rpc.mainnet.soo.network/rpc"
-      : "https://rpc.testnet.soo.network/rpc";
-  return new Connection(endpoint, "confirmed");
+export async function getConnection(network: NetworkName): Promise<Connection> {
+  const rpc = await axios.get(getApiUrl(network).BASE_HOST + API_URLS.RPCS).then(res => res.data)
+  return new Connection(rpc.data.rpcs[0].url, "confirmed");
 }
 
 /**
@@ -52,6 +49,6 @@ export class AccountLoader {
   }
 }
 
-const VALID_PROGRAM_ID = new Set([CLMM_PROGRAM_ID.toBase58(), DEVNET_PROGRAM_ID.CLMM.toBase58()])
+export const VALID_PROGRAM_ID = getCLMMProgramId(NetworkName.sooneth).toBase58()
 
-export const isValidClmm = (id: string) => VALID_PROGRAM_ID.has(id)
+export const isValidClmm = (id: string) => VALID_PROGRAM_ID === id

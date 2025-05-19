@@ -1,6 +1,7 @@
-import { CobaltX, CLMM_PROGRAM_ID } from "@cobaltx/sdk-v2";
+import { CobaltX, getCLMMProgramId } from "@cobaltx/sdk-v2";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { AccountLoader, getConnection } from "./utils";
+import { NetworkName } from "@cobaltx/sdk-v2/lib/config";
 require("dotenv").config();
 
 export async function initSdk(params: {
@@ -14,6 +15,7 @@ export async function initSdk(params: {
     connection: params.conn,
     disableFeatureCheck: true,
     disableLoadToken: !params?.loadToken,
+    network: NetworkName.sooneth,
   });
 
   return cobaltx;
@@ -66,7 +68,7 @@ async function getPositions({
 async function main() {
   const al = new AccountLoader();
   const userAddress = process.env.USER_ADDRESS;
-  const conn = getConnection("mainnet");
+  const conn = await getConnection(NetworkName.sooneth);
 
   if (!userAddress) {
     throw new Error('Please set USER_ADDRESS in .env file');
@@ -83,7 +85,7 @@ async function main() {
     console.log('Fetching CLMM positions...');
     const positions = await getPositions({
       cobaltx,
-      programId: CLMM_PROGRAM_ID,
+      programId: getCLMMProgramId(NetworkName.sooneth),
     });
 
     if (positions.length === 0) {
